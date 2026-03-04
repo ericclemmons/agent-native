@@ -4,27 +4,25 @@
 
 Inspired by [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs. Where agent-browser gives AI agents structured control over web pages via CDP and the DOM, `agent-native` does the same for macOS native applications via the Accessibility (AX) tree.
 
-## Setup
+## Install
 
-### Prerequisites
-- macOS 13+ (Ventura)
-- Swift 5.9+ (Xcode 15+)
-- **Accessibility permissions** granted to your terminal
+### Homebrew
 
-### Build
+```bash
+brew install ericclemmons/tap/agent-native
+```
+
+### From source
 
 ```bash
 git clone https://github.com/ericclemmons/agent-native.git
 cd agent-native
-swift build -c release
-```
-
-### Install
-
-```bash
 make install
-# Copies binary to /usr/local/bin/agent-native
 ```
+
+### Prerequisites
+- macOS 13+ (Ventura)
+- **Accessibility permissions** granted to your terminal
 
 ### Grant Accessibility Access
 
