@@ -7,7 +7,7 @@ struct AgentNative: ParsableCommand {
         abstract:
             "Control macOS native apps via the Accessibility tree.",
         discussion: """
-            Inspired by agent-browser (https://github.com/vercel-labs/agent-browser).
+            Inspired by agent-browser by Chris Tate (https://github.com/vercel-labs/agent-browser).
             Uses macOS Accessibility APIs to give AI agents structured control
             over native applications.
 

@@ -1,0 +1,13 @@
+agent-native
+Copyright 2026 Eric Clemmons
+
+This project was inspired by agent-browser, created by Chris Tate
+and the Vercel Labs team.
+
+  agent-browser: https://github.com/vercel-labs/agent-browser
+  Licensed under the Apache License, Version 2.0
+
+While agent-native is an independent implementation in Swift for macOS,
+the original concept and CLI design of agent-browser were a major
+inspiration. Huge thanks to Chris Tate for the idea and for building
+such a great tool.
