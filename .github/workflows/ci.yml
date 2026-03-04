@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build & Quick Test
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: CLI smoke test
+        run: |
+          .build/release/agent-native --version
+          .build/release/agent-native --help
+          .build/release/agent-native apps
+
+  integration:
+    name: Integration Tests
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build agent-native
+        run: swift build -c release
+
+      - name: Build test fixture
+        run: swiftc -o .build/TestFixture TestFixture/TestFixture.swift -framework Cocoa
+
+      - name: Grant accessibility permissions
+        run: |
+          TCC_DB="/Library/Application Support/com.apple.TCC/TCC.db"
+
+          grant_access() {
+            local client="$1"
+            sudo sqlite3 "$TCC_DB" \
+              "INSERT OR REPLACE INTO access (service, client, client_type, auth_value, auth_reason, auth_version) \
+               VALUES ('kTCCServiceAccessibility', '$client', 1, 2, 4, 1);" 2>/dev/null || true
+          }
+
+          grant_access "/bin/bash"
+          grant_access "/bin/zsh"
+          grant_access "/usr/bin/env"
+          grant_access "$PWD/.build/release/agent-native"
+          grant_access "$PWD/.build/TestFixture"
+
+          RUNNER_BIN=$(which bash)
+          grant_access "$RUNNER_BIN"
+
+          echo "TCC grants applied"
+
+      - name: Run integration tests
+        run: |
+          chmod +x test/integration.sh
+          ./test/integration.sh
+
+      - name: Run quick tests (fallback if AX fails)
+        if: failure()
+        run: |
+          chmod +x test/integration.sh
+          ./test/integration.sh --quick
