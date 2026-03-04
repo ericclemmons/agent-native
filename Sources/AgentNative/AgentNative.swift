@@ -17,7 +17,7 @@ struct AgentNative: ParsableCommand {
               3. agent-native click @n5
               4. agent-native fill @n3 "search query"
             """,
-        version: "0.1.1",
+        version: "0.1.2",
         subcommands: [
             AppsCommand.self,
             OpenCommand.self,
