@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal binary
+        run: |
+          swift build -c release --arch arm64 --arch x86_64
+          strip .build/apple/Products/Release/agent-native
+
+      - name: Create tarball
+        run: |
+          mkdir -p dist
+          cp .build/apple/Products/Release/agent-native dist/
+          cd dist
+          tar czf ../agent-native-macos.tar.gz agent-native
+
+      - name: Compute SHA256
+        id: sha
+        run: echo "sha256=$(shasum -a 256 agent-native-macos.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" agent-native-macos.tar.gz \
+            --title "${{ github.ref_name }}" \
+            --notes "SHA256: \`${{ steps.sha.outputs.sha256 }}\`"
+
+      - name: Update Homebrew tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/ericclemmons/homebrew-tap.git" tap
+          cd tap
+
+          mkdir -p Formula
+
+          python3 -c "
+          print('''class AgentNative < Formula
+            desc \"Control macOS native apps via the Accessibility tree for AI agents\"
+            homepage \"https://github.com/ericclemmons/agent-native\"
+            url \"https://github.com/ericclemmons/agent-native/releases/download/v#{version}/agent-native-macos.tar.gz\"
+            sha256 \"${SHA256}\"
+            version \"${VERSION}\"
+
+            depends_on :macos
+
+            def install
+              bin.install \"agent-native\"
+            end
+
+            test do
+              assert_match version.to_s, shell_output(\"#{bin}/agent-native --version\")
+            end
+          end
+          '''.strip())
+          " > Formula/agent-native.rb
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/agent-native.rb
+          git commit -m "Update agent-native to ${VERSION}"
+          git push
