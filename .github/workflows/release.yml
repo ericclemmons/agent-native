@@ -55,9 +55,9 @@ jobs:
           print('''class AgentNative < Formula
             desc \"Control macOS native apps via the Accessibility tree for AI agents\"
             homepage \"https://github.com/ericclemmons/agent-native\"
+            version \"${VERSION}\"
             url \"https://github.com/ericclemmons/agent-native/releases/download/v#{version}/agent-native-macos.tar.gz\"
             sha256 \"${SHA256}\"
-            version \"${VERSION}\"
 
             depends_on :macos
 
