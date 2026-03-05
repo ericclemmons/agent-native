@@ -1,5 +1,9 @@
 # agent-native
 
+> **⚠️ This project is archived. I recommend using [agent-desktop](https://github.com/lahfir/agent-desktop/) instead.**
+
+---
+
 **Control macOS native apps via the Accessibility tree — like [agent-browser](https://github.com/vercel-labs/agent-browser), but for the desktop.**
 
 Inspired by [agent-browser](https://github.com/vercel-labs/agent-browser) by Vercel Labs. Where agent-browser gives AI agents structured control over web pages via CDP and the DOM, `agent-native` does the same for macOS native applications via the Accessibility (AX) tree.

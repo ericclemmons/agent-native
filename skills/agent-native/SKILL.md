@@ -14,13 +14,18 @@ macOS native app automation via the Accessibility tree. Like agent-browser, but 
 
 ## Core Workflow
 
-**snapshot -> read refs -> interact by ref -> re-snapshot**
+**apps -> pick/open target -> snapshot -> interact by ref -> re-snapshot**
+
+1. **Always start with `agent-native apps`** to see what's already running. Prefer reusing an already-open app (e.g. if a browser is already open, use it instead of opening a different one).
+   - **Known browsers:** Safari, Arc, Chrome, Firefox, Helium. Any of these can be used for web tasks.
+2. Only call `agent-native open <app>` if the target app isn't already running.
+3. Snapshot, interact, and re-snapshot as needed.
 
 ```bash
-agent-native open "System Settings"
-agent-native snapshot "System Settings" -i    # Get interactive elements with @refs
-agent-native click @n5                        # Interact using refs
-agent-native snapshot "System Settings" -i    # Re-snapshot after UI changes
+agent-native apps                            # Check what's already running
+agent-native snapshot Safari -i              # Use the already-open browser
+agent-native click @n5                       # Interact using refs
+agent-native snapshot Safari -i              # Re-snapshot after UI changes
 ```
 
 Always re-snapshot after actions that change the UI. Refs are invalidated when UI structure changes.
@@ -125,31 +130,56 @@ agent-native wait <app> --title "Apply" --timeout 5
 agent-native wait <app> --role AXSheet --timeout 10
 ```
 
-## Electron / Web Apps (Slack, Discord, VS Code, etc.)
+## Browser & Electron Enhanced Access
 
-Electron apps expose a minimal AX tree — inner UI elements are often opaque AXGroups with no labels. When `snapshot -i` returns very few useful elements:
+Chromium browsers (Arc, Chrome, Edge, Brave, Vivaldi) and Electron apps don't expose web DOM content in the macOS AX tree by default. `snapshot` now auto-detects these apps and enhances access automatically.
 
-1. **Use `key` for keyboard shortcuts** — most Electron apps have rich keyboard support:
+**Priority chain:** CDP read → AX-enhanced interact → keyboard fallback → screenshot
+
+### Automatic Detection in `snapshot`
+
+```bash
+agent-native snapshot Arc -i                      # Auto-detects Chromium, enables AX enhancement
+agent-native snapshot "VS Code" -i                # Auto-detects Electron, enables AX enhancement
+```
+
+When `snapshot` detects a Chromium/Electron app:
+1. **CDP mode** (richest): If browser was launched with `--remote-debugging-port`, snapshot reads the full web accessibility tree via Chrome DevTools Protocol
+2. **AX-enhanced mode** (fallback): Sets `AXEnhancedUserInterface` to force the app to build its accessibility tree, then walks it normally
+
+### CDP Mode (richest web content)
+
+Launch your browser with CDP enabled for the best results:
+
+```bash
+# Launch Chrome with CDP
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222
+
+# Snapshot auto-detects CDP on ports 9222/9229
+agent-native snapshot Chrome -i
+
+# Or specify a port explicitly
+agent-native snapshot Chrome -i --port 9222
+```
+
+### Manual Persistent Control
+
+```bash
+agent-native ax-enable Arc                        # Persistently enable AXEnhancedUserInterface
+agent-native snapshot Arc -i                      # Now shows web page elements
+agent-native ax-disable Arc                       # Restore when done
+```
+
+### Fallback: Keyboard Shortcuts + Screenshots
+
+When AX tree is still sparse (some Electron apps), fall back to keyboard-driven interaction:
 
 ```bash
 agent-native key Slack cmd+k                     # Open quick switcher
 agent-native key Slack "channel name" return     # Type and confirm
+agent-native screenshot Slack /tmp/slack.png     # Visual confirmation
+agent-native get title Slack                     # Check navigation state
 ```
-
-2. **Use `screenshot` for visual aid** — see what's on screen when the AX tree isn't helpful:
-
-```bash
-agent-native screenshot Slack /tmp/slack.png     # Capture Slack's window
-```
-
-3. **Use the window title** to confirm navigation state:
-
-```bash
-agent-native get title Slack
-# "Chad Donohue (DM) - Ryan Florence Fan Club - Slack"
-```
-
-4. **Common Slack shortcuts**: Cmd+K (quick switcher), Cmd+U (upload file), Cmd+N (new message).
 
 ### Pasting files into apps
 

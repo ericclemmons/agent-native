@@ -20,6 +20,9 @@ struct SnapshotCommand: ParsableCommand {
     @Option(name: .shortAndLong, help: "Max tree depth")
     var depth: Int = 8
 
+    @Option(name: .long, help: "CDP port (auto-scans 9222, 9229 if omitted)")
+    var port: Int?
+
     @Flag(name: .long, help: "JSON output")
     var json: Bool = false
 
@@ -44,7 +47,33 @@ struct SnapshotCommand: ParsableCommand {
 
         let pid = runningApp.processIdentifier
         let element = AXEngine.appElement(pid: pid)
-        let tree = AXEngine.walkTree(element, maxDepth: depth)
+        let appType = AppDetector.detect(runningApp)
+
+        var tree: [(node: AXNode, depth: Int)]
+        var source = "ax"
+
+        switch appType {
+        case .chromiumBrowser, .electron:
+            // Try CDP first
+            let cdpPort = port ?? AppDetector.findCDPPort()
+            if let cdpPort = cdpPort, let cdpTree = tryCDP(port: cdpPort) {
+                // CDP for web content, native AX for browser chrome (depth 1)
+                let chromeTree = AXEngine.walkTree(element, maxDepth: 1)
+                tree = chromeTree + cdpTree
+                source = "cdp"
+                // Also enable AX enhancement so subsequent click/fill commands work
+                _ = AXEnhancer.autoEnhance(runningApp)
+            } else {
+                // Fallback: AX enhancement
+                let cleanup = AXEnhancer.autoEnhance(runningApp)
+                tree = AXEngine.walkTree(element, maxDepth: depth)
+                // Don't restore -- leave enhanced for interaction commands
+                _ = cleanup  // keep reference but don't call
+            }
+
+        case .safari, .native:
+            tree = AXEngine.walkTree(element, maxDepth: depth)
+        }
 
         var refCounter = 0
         var refEntries: [RefStore.RefEntry] = []
@@ -110,7 +139,8 @@ struct SnapshotCommand: ParsableCommand {
             }
         } else {
             let appName = runningApp.localizedName ?? app
-            print("Snapshot: \(appName) (pid \(pid)) -- \(refNodes.count) elements")
+            let sourceTag = source == "cdp" ? " [CDP]" : (source == "ax-enhanced" ? " [AX-enhanced]" : "")
+            print("Snapshot: \(appName) (pid \(pid)) -- \(refNodes.count) elements\(sourceTag)")
             print(String(repeating: "-", count: 45))
             for rn in refNodes {
                 let indent = String(repeating: "  ", count: rn.depth)
@@ -129,5 +159,19 @@ struct SnapshotCommand: ParsableCommand {
                 print(line)
             }
         }
+    }
+
+    // MARK: - CDP helper
+
+    private func tryCDP(port: Int) -> [(node: AXNode, depth: Int)]? {
+        let client = CDPClient(port: port)
+        guard let tabs = try? client.listTabs() else { return nil }
+        // Get AX tree from the first "page" type tab
+        guard let pageTab = tabs.first(where: { $0.type == "page" }) ?? tabs.first else {
+            return nil
+        }
+        guard let cdpNodes = try? client.getFullAXTree(tab: pageTab) else { return nil }
+        let result = client.convertToAXNodes(cdpNodes)
+        return result.isEmpty ? nil : result
     }
 }

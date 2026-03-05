@@ -21,6 +21,8 @@ struct AgentNative: ParsableCommand {
         subcommands: [
             ActionCommand.self,
             AppsCommand.self,
+            AXDisableCommand.self,
+            AXEnableCommand.self,
             CheckCommand.self,
             ClickCommand.self,
             FillCommand.self,
